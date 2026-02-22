@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Curling Master Pro - Enhanced Controls</title>
+    <title>Curling Master Pro - Precision Controls</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -53,12 +53,36 @@
             border: 1px solid rgba(0,0,0,0.1);
         }
 
-        .power-meter {
-            position: absolute; left: 50%; bottom: 120px;
+        .power-meter-container {
+            position: absolute; left: 50%; bottom: 130px;
             transform: translateX(-50%);
-            width: 200px; height: 8px;
-            background: rgba(0,0,0,0.1);
-            border-radius: 4px; overflow: hidden;
+            width: 300px;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .power-meter {
+            width: 100%; height: 16px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 8px; overflow: hidden;
+            position: relative;
+            border: 2px solid rgba(255,255,255,0.5);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .power-markers {
+            position: absolute; inset: 0;
+            display: flex; justify-content: space-evenly;
+            pointer-events: none;
+        }
+        .marker {
+            width: 2px; height: 100%;
+            background: rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .marker::after {
+            content: attr(data-label);
+            position: absolute; top: -18px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px; font-weight: 900; color: #1e293b;
         }
 
         .spin-selector {
@@ -69,6 +93,7 @@
             padding: 4px; border-radius: 20px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             pointer-events: auto; z-index: 150;
+            transition: opacity 0.3s;
         }
         .spin-opt {
             width: 28px; height: 28px; border-radius: 50%;
@@ -137,11 +162,12 @@
             pointer-events: auto; z-index: 150;
         }
         .zoom-btn {
-            width: 44px; height: 44px; background: white;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-weight: bold; font-size: 20px;
-            color: #1e293b; cursor: pointer; user-select: none;
+            width: 50px; height: 50px; background: white;
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-weight: bold; font-size: 24px;
+            color: #1e293b; cursor: pointer; user-select: none; transition: background 0.2s;
         }
+        .zoom-btn:active { background: #f1f5f9; }
         
         .replay-overlay {
             position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
@@ -212,13 +238,20 @@
         <div class="spin-opt" onclick="setSpin(3)">R3</div>
     </div>
 
-    <div class="power-meter">
-        <div id="power-fill" class="h-full w-0 bg-gradient-to-r from-green-400 via-yellow-400 to-red-500"></div>
+    <div class="power-meter-container" id="power-ui">
+        <div class="power-meter">
+            <div id="power-fill" class="h-full w-0 bg-gradient-to-r from-green-400 via-yellow-400 to-red-500"></div>
+            <div class="power-markers">
+                <div class="marker" data-label="25%"></div>
+                <div class="marker" data-label="50%"></div>
+                <div class="marker" data-label="75%"></div>
+            </div>
+        </div>
     </div>
 
     <div class="zoom-controls">
-        <div class="zoom-btn" onclick="adjustZoom(0.2)">+</div>
-        <div class="zoom-btn" onclick="adjustZoom(-0.2)">-</div>
+        <div class="zoom-btn" onclick="adjustZoom(1.2)">🔍+</div>
+        <div class="zoom-btn" onclick="adjustZoom(0.8)">🔍-</div>
     </div>
 
     <div id="end-card">
@@ -257,7 +290,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        // --- PHYSICS CONFIG ---
         const PHYSICS = {
             friction: 0.992,
             angularFriction: 0.985,
@@ -267,9 +299,10 @@
             stoneRadius: 10,
             houseRadius: 80,
             rinkWidth: 350,
-            powerFillSpeed: 0.55,      // Velocidade do medidor
+            powerFillSpeed: 0.55,
             houseY: 60,
-            spinPower: 0.025
+            spinPower: 0.025,
+            launchY: 950
         };
 
         let state = {
@@ -287,10 +320,10 @@
             isPanning: false,
             panStartY: 0,
             gameOver: false,
-            camera: { x: 0, y: 500, zoom: 1 },
+            camera: { x: 0, y: 500, zoom: 0.8 },
+            shouldCameraFollow: true, // Nova flag para câmera inteligente
             scoringStones: [],
             
-            // Replay Data
             isReplaying: false,
             replayIndex: 0,
             lastLaunchData: [],
@@ -375,13 +408,11 @@
             state.height = window.innerHeight;
             canvas.width = state.width;
             canvas.height = state.height;
-            resetZoom();
         }
 
-        function resetZoom() {
-            state.camera.zoom = Math.min(state.width / 400, state.height / 1000);
-            state.camera.y = state.gameOver ? PHYSICS.houseY : 500;
-            state.camera.x = 0;
+        function adjustZoom(factor) {
+            state.camera.zoom *= factor;
+            state.camera.zoom = Math.max(0.3, Math.min(3.0, state.camera.zoom));
         }
 
         function stopReplay() {
@@ -389,7 +420,6 @@
                 state.isReplaying = false;
                 document.getElementById('replay-overlay').style.display = 'none';
                 document.getElementById('replay-btn').style.display = 'flex';
-                resetZoom();
             }
         }
 
@@ -397,11 +427,9 @@
             e.stopPropagation();
             if (state.gameOver || state.stones.some(s => s.moving)) return;
             
-            // MANDATORY: Sair do replay se preparar o lançamento
             stopReplay();
-
             state.readyToLaunch = !state.readyToLaunch;
-            if (state.readyToLaunch) state.camera.y = 850;
+            if (state.readyToLaunch) state.camera.y = 850; 
             updateUI();
         }
 
@@ -468,7 +496,7 @@
         }
 
         function launchStone() {
-            const startX = 0, startY = 950;
+            const startX = 0, startY = PHYSICS.launchY;
             const angle = Math.atan2(state.mouseY - startY, state.mouseX - startX);
             const force = (state.power / 100) * PHYSICS.maxInitialVel;
             const activeTeam = state.turn === 1 ? team1 : team2;
@@ -486,6 +514,20 @@
                 moving: true,
                 rotation: 0 
             };
+
+            // LÓGICA DE CÂMERA INTELIGENTE
+            // Verifica se a casa está na tela com o zoom e posição atual
+            const houseScreenY = (PHYSICS.houseY - state.camera.y) * state.camera.zoom + (state.height / 2);
+            const launchScreenY = (PHYSICS.launchY - state.camera.y) * state.camera.zoom + (state.height / 2);
+            
+            // Se a casa ou o lançamento estiverem fora da margem visível (com 10% de folga)
+            const margin = state.height * 0.1;
+            if (houseScreenY < margin || launchScreenY > state.height - margin) {
+                state.shouldCameraFollow = true;
+            } else {
+                state.shouldCameraFollow = false;
+            }
+
             state.stones.push(stone);
             state.currentStone = stone;
             state.stonesLeft--;
@@ -524,7 +566,6 @@
             drawRink();
 
             if (state.isCharging) {
-                // Loop da barra de força: se passar de 100, volta pra 0
                 state.power += PHYSICS.powerFillSpeed;
                 if (state.power > 100) state.power = 0;
                 document.getElementById('power-fill').style.width = state.power + '%';
@@ -557,7 +598,12 @@
                         s.vx = 0; s.vy = 0; s.spin = 0; s.moving = false;
                         stoneStoppedThisFrame = true;
                     }
-                    if (s === state.currentStone) state.camera.y = s.y;
+                    
+                    // Decisão inteligente de seguir
+                    if (s === state.currentStone && state.shouldCameraFollow) {
+                        // Interpolação suave para a câmera não dar tranco
+                        state.camera.y += (s.y - state.camera.y) * 0.1;
+                    }
                 }
                 drawStone(s);
             });
@@ -582,25 +628,19 @@
 
         function runReplayFrame() {
             const frameToDisplay = Math.floor(state.replayIndex);
-
             if (frameToDisplay >= state.lastLaunchData.length) {
                 stopReplay();
                 return;
             }
 
             const currentFrame = state.lastLaunchData[frameToDisplay];
-            const movingStone = currentFrame.find(s => s.id === state.currentStone?.id) || currentFrame[currentFrame.length-1];
-            state.camera.y = movingStone.y;
-            state.camera.zoom = 1.9;
-
+            
             ctx.save();
             ctx.translate(state.width/2, state.height/2);
             ctx.scale(state.camera.zoom, state.camera.zoom);
             ctx.translate(-state.camera.x, -state.camera.y);
-
             drawRink();
             currentFrame.forEach(s => drawStone(s));
-            
             ctx.restore();
             state.replayIndex += state.replaySpeedFactor;
         }
@@ -667,10 +707,8 @@
             ctx.rotate(s.rotation || 0);
             ctx.beginPath(); ctx.arc(0, 0, PHYSICS.stoneRadius * 0.55, 0, Math.PI * 2);
             ctx.fillStyle = s.handleColor; ctx.fill();
-            
             ctx.fillStyle = "rgba(0,0,0,0.2)";
             ctx.fillRect(-2, -PHYSICS.stoneRadius * 0.4, 4, PHYSICS.stoneRadius * 0.8);
-
             ctx.restore();
 
             if (state.gameOver) {
@@ -683,49 +721,42 @@
 
         function drawGuides() {
             if (state.isCharging) {
-                const startX = 0, startY = 950;
+                const startX = 0, startY = PHYSICS.launchY;
                 const angle = Math.atan2(state.mouseY - startY, state.mouseX - startX);
-                
-                // --- NOVA REPRESENTAÇÃO VISUAL DA FORÇA ---
-                const maxLen = 120;
+                const maxLen = 140;
                 const currentLen = (state.power / 100) * maxLen;
-                const arrowWidth = 14;
+                const arrowWidth = 18;
 
                 ctx.save();
                 ctx.translate(startX, startY);
                 ctx.rotate(angle);
 
-                // Fundo da seta (guia)
                 ctx.beginPath();
                 ctx.moveTo(0, -arrowWidth/2);
                 ctx.lineTo(maxLen, -arrowWidth/2);
-                ctx.lineTo(maxLen + 10, 0);
+                ctx.lineTo(maxLen + 15, 0);
                 ctx.lineTo(maxLen, arrowWidth/2);
                 ctx.lineTo(0, arrowWidth/2);
                 ctx.closePath();
                 ctx.fillStyle = 'rgba(0,0,0,0.05)';
                 ctx.fill();
 
-                // Preenchimento da força (Gradiente)
                 const grad = ctx.createLinearGradient(0, 0, maxLen, 0);
-                grad.addColorStop(0, '#4ade80'); // Green
-                grad.addColorStop(0.5, '#facc15'); // Yellow
-                grad.addColorStop(1, '#ef4444'); // Red
+                grad.addColorStop(0, '#4ade80');
+                grad.addColorStop(0.5, '#facc15');
+                grad.addColorStop(1, '#ef4444');
 
                 ctx.beginPath();
                 ctx.moveTo(0, -arrowWidth/2);
                 ctx.lineTo(currentLen, -arrowWidth/2);
-                ctx.lineTo(currentLen + (currentLen > 0 ? 5 : 0), 0);
+                ctx.lineTo(currentLen + (currentLen > 0 ? 8 : 0), 0);
                 ctx.lineTo(currentLen, arrowWidth/2);
                 ctx.lineTo(0, arrowWidth/2);
                 ctx.closePath();
                 ctx.fillStyle = grad;
                 ctx.fill();
-                
-                // Bordas
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                 ctx.stroke();
-
                 ctx.restore();
             }
             if (state.isSweeping && state.stones.some(s => s.moving)) {
@@ -745,7 +776,6 @@
                 id: s.id, team: s.team, flagId: s.flagId,
                 dist: Math.sqrt(s.x*s.x + (s.y - PHYSICS.houseY)**2)
             })).filter(s => s.dist <= PHYSICS.houseRadius);
-
             stonesInfo.sort((a, b) => a.dist - b.dist);
 
             let s1 = 0, s2 = 0;
@@ -787,7 +817,6 @@
 
         function updateUI() {
             if (state.isReplaying) return;
-            
             const anyMoving = state.stones.some(s => s.moving);
             const tracker = document.getElementById('stones-tracker');
             tracker.innerHTML = Array(state.stonesLeft).fill(0).map(() => `<div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div>`).join('');
@@ -800,30 +829,37 @@
             const btn = document.getElementById('launch-btn');
             const txt = document.getElementById('launch-text');
             const spinUi = document.getElementById('spin-ui');
+            const powerUi = document.getElementById('power-ui');
 
             if (state.gameOver) { 
                 btn.style.display = 'none'; 
                 spinUi.style.display = 'none';
-                document.querySelector('.power-meter').style.display = 'none';
+                powerUi.style.display = 'none';
                 return; 
             }
 
             if (anyMoving) {
                 btn.classList.add('opacity-50', 'pointer-events-none');
-                spinUi.classList.add('opacity-0', 'pointer-events-none');
+                spinUi.style.opacity = '0';
+                spinUi.classList.add('pointer-events-none');
                 txt.innerText = state.isSweeping ? "VARRENDO!" : "AGUARDE";
                 document.getElementById('replay-btn').style.display = 'none';
+                powerUi.style.opacity = '0';
             } else {
                 btn.classList.remove('opacity-50', 'pointer-events-none');
                 btn.style.backgroundColor = currentT.color;
                 if (state.readyToLaunch) {
                     btn.classList.add('ready');
                     txt.innerText = "LANCE!";
-                    spinUi.classList.remove('opacity-0', 'pointer-events-none');
+                    spinUi.style.opacity = '1';
+                    spinUi.classList.remove('pointer-events-none');
+                    powerUi.style.opacity = '1';
                 } else {
                     btn.classList.remove('ready');
                     txt.innerText = "PREPARAR";
-                    spinUi.classList.add('opacity-0', 'pointer-events-none');
+                    spinUi.style.opacity = '0';
+                    spinUi.classList.add('pointer-events-none');
+                    powerUi.style.opacity = '0';
                 }
             }
         }
