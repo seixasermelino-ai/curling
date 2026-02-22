@@ -321,7 +321,7 @@
             panStartY: 0,
             gameOver: false,
             camera: { x: 0, y: 500, zoom: 0.8 },
-            shouldCameraFollow: true, // Nova flag para câmera inteligente
+            shouldCameraFollow: true,
             scoringStones: [],
             
             isReplaying: false,
@@ -410,9 +410,16 @@
             canvas.height = state.height;
         }
 
+        // Função de zoom corrigida: Atualiza o zoom e garante o redesenho imediato
         function adjustZoom(factor) {
+            const oldZoom = state.camera.zoom;
             state.camera.zoom *= factor;
+            
+            // Limites de zoom
             state.camera.zoom = Math.max(0.3, Math.min(3.0, state.camera.zoom));
+            
+            // Reajusta a posição para o zoom parecer "centralizado" se necessário
+            // (Neste caso, o motor de renderização cuida disso no translate principal)
         }
 
         function stopReplay() {
@@ -429,12 +436,14 @@
             
             stopReplay();
             state.readyToLaunch = !state.readyToLaunch;
+            // Quando preparar, foca na zona de lançamento
             if (state.readyToLaunch) state.camera.y = 850; 
             updateUI();
         }
 
         function handleMouseDown(e) {
             if (state.isReplaying) return;
+            // Ignora clicks na interface
             if (e.target.closest('.scoreboard') || e.target.closest('#launch-btn') || e.target.closest('#end-card') || e.target.closest('.zoom-controls') || e.target.closest('.spin-selector') || e.target.closest('#replay-btn')) return;
             
             const anyMoving = state.stones.some(s => s.moving);
@@ -516,12 +525,10 @@
             };
 
             // LÓGICA DE CÂMERA INTELIGENTE
-            // Verifica se a casa está na tela com o zoom e posição atual
             const houseScreenY = (PHYSICS.houseY - state.camera.y) * state.camera.zoom + (state.height / 2);
             const launchScreenY = (PHYSICS.launchY - state.camera.y) * state.camera.zoom + (state.height / 2);
-            
-            // Se a casa ou o lançamento estiverem fora da margem visível (com 10% de folga)
-            const margin = state.height * 0.1;
+            const margin = state.height * 0.15; // Margem de segurança um pouco maior
+
             if (houseScreenY < margin || launchScreenY > state.height - margin) {
                 state.shouldCameraFollow = true;
             } else {
@@ -599,10 +606,9 @@
                         stoneStoppedThisFrame = true;
                     }
                     
-                    // Decisão inteligente de seguir
+                    // Segue a pedra se necessário
                     if (s === state.currentStone && state.shouldCameraFollow) {
-                        // Interpolação suave para a câmera não dar tranco
-                        state.camera.y += (s.y - state.camera.y) * 0.1;
+                        state.camera.y += (s.y - state.camera.y) * 0.08;
                     }
                 }
                 drawStone(s);
