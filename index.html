@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Curling Master Pro</title>
+    <title>Curling Master Pro - Flags Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -21,9 +21,9 @@
             position: absolute; inset: 0;
             display: flex; flex-direction: column;
             z-index: 500;
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.98);
             backdrop-filter: blur(10px);
-            padding: 2rem;
+            padding: 1.5rem;
             color: white;
             justify-content: center;
             align-items: center;
@@ -36,14 +36,23 @@
             padding: 10px;
         }
         .scoreboard {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 1rem;
             padding: 8px 16px;
             display: flex; align-items: center; justify-content: space-between;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             pointer-events: auto;
-            max-width: 500px; margin: 0 auto;
+            max-width: 550px; margin: 0 auto;
+        }
+
+        .flag-img {
+            width: 32px;
+            height: 22px;
+            object-fit: cover;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.1);
         }
 
         .power-meter {
@@ -66,8 +75,9 @@
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: auto; cursor: pointer;
             text-align: center;
+            z-index: 200;
         }
-        #launch-btn.ready { transform: translateX(-50%) scale(1.1); }
+        #launch-btn.ready { transform: translateX(-50%) scale(1.1); box-shadow: 0 0 20px rgba(255,255,255,0.4); }
 
         /* Card de Fim de Jogo */
         #end-card {
@@ -79,10 +89,26 @@
 
         .country-opt {
             cursor: pointer; transition: all 0.2s;
-            border: 2px solid transparent;
+            border: 2px solid #334155;
+            background: #1e293b;
+            position: relative;
         }
-        .country-opt:hover { transform: scale(1.05); }
-        .country-opt.selected { border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        .country-opt:hover { border-color: #64748b; }
+        .country-opt.selected { border-color: #3b82f6; background: #0f172a; }
+
+        /* Preview da Pedra no Menu */
+        .stone-preview {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            border: 1px solid #000;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .handle-preview {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: white;
+        }
 
         .zoom-controls {
             position: absolute; bottom: 30px; right: 20px;
@@ -101,20 +127,22 @@
 
     <!-- Tela Inicial -->
     <div id="start-screen" class="screen">
-        <h1 class="text-4xl font-black italic mb-8 tracking-tighter uppercase">Curling Master</h1>
+        <h1 class="text-4xl font-black italic mb-6 tracking-tighter uppercase text-center">
+            <span class="text-blue-500">Curling</span> Master
+        </h1>
         
-        <div class="grid grid-cols-2 gap-4 w-full max-w-md mb-8">
-            <div class="space-y-2">
-                <p class="text-[10px] font-bold uppercase text-slate-400">Time 1</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl mb-8">
+            <div class="space-y-3">
+                <p class="text-[11px] font-black uppercase text-slate-500 tracking-widest text-center">Time 1 (Lança Primeiro)</p>
                 <div id="team1-list" class="grid grid-cols-2 gap-2"></div>
             </div>
-            <div class="space-y-2">
-                <p class="text-[10px] font-bold uppercase text-slate-400">Time 2</p>
+            <div class="space-y-3">
+                <p class="text-[11px] font-black uppercase text-slate-500 tracking-widest text-center">Time 2 (O Martelo)</p>
                 <div id="team2-list" class="grid grid-cols-2 gap-2"></div>
             </div>
         </div>
 
-        <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black px-12 py-4 rounded-full transition-all shadow-xl shadow-blue-900/40 uppercase italic tracking-widest">
+        <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black px-12 py-4 rounded-full transition-all shadow-xl shadow-blue-900/40 uppercase italic tracking-widest active:scale-95">
             Começar Partida
         </button>
     </div>
@@ -123,24 +151,24 @@
     <div class="game-ui">
         <div class="scoreboard">
             <div class="flex items-center gap-3">
-                <div id="ui-t1-flag" class="text-2xl">🇧🇷</div>
+                <img id="ui-t1-flag" src="" class="flag-img">
                 <div>
                     <div id="ui-t1-name" class="text-[10px] font-black uppercase text-slate-400 leading-none">BRA</div>
-                    <div id="ui-t1-score" class="text-xl font-black leading-tight">0</div>
+                    <div id="ui-t1-score" class="text-xl font-black text-slate-800 leading-tight">0</div>
                 </div>
             </div>
 
             <div class="flex flex-col items-center">
-                <div id="turn-indicator" class="text-[9px] font-black uppercase tracking-tighter bg-green-500 text-white px-3 py-1 rounded-full mb-1">Brasil joga</div>
+                <div id="turn-indicator" class="text-[9px] font-black uppercase tracking-tighter text-white px-4 py-1.5 rounded-full mb-1 shadow-sm">Brasil joga</div>
                 <div class="flex gap-1" id="stones-tracker"></div>
             </div>
 
             <div class="flex items-center gap-3 text-right">
                 <div>
                     <div id="ui-t2-name" class="text-[10px] font-black uppercase text-slate-400 leading-none">ARG</div>
-                    <div id="ui-t2-score" class="text-xl font-black leading-tight">0</div>
+                    <div id="ui-t2-score" class="text-xl font-black text-slate-800 leading-tight">0</div>
                 </div>
-                <div id="ui-t2-flag" class="text-2xl">🇦🇷</div>
+                <img id="ui-t2-flag" src="" class="flag-img">
             </div>
         </div>
     </div>
@@ -152,19 +180,19 @@
 
     <!-- Controles de Zoom -->
     <div class="zoom-controls">
-        <div class="zoom-btn" onclick="adjustZoom(0.2)">＋</div>
-        <div class="zoom-btn" onclick="adjustZoom(-0.2)">－</div>
+        <div class="zoom-btn" onclick="adjustZoom(0.2)">+</div>
+        <div class="zoom-btn" onclick="adjustZoom(-0.2)">-</div>
     </div>
 
     <!-- Card de Resultado Final -->
     <div id="end-card">
-        <h3 class="text-xs font-black uppercase mb-2 text-slate-800">Análise da Casa</h3>
-        <div id="end-summary" class="text-sm font-bold text-blue-600 mb-3"></div>
-        <div id="mini-dist-list" class="space-y-1 mb-3 max-h-[150px] overflow-y-auto"></div>
-        <button onclick="location.reload()" class="w-full bg-slate-800 text-white text-[10px] py-2 rounded-lg font-bold">NOVA PARTIDA</button>
+        <h3 class="text-xs font-black uppercase mb-2 text-slate-800 border-b pb-1">Análise da Casa</h3>
+        <div id="end-summary" class="text-sm font-black text-blue-600 mb-3"></div>
+        <div id="mini-dist-list" class="space-y-1 mb-4 max-h-[180px] overflow-y-auto"></div>
+        <button onclick="location.reload()" class="w-full bg-blue-600 text-white text-[10px] py-2.5 rounded-lg font-black uppercase tracking-widest shadow-md">Nova Partida</button>
     </div>
 
-    <div id="launch-btn" style="background-color: #22c55e;">
+    <div id="launch-btn">
         <span class="text-lg">🥌</span>
         <span id="launch-text">PREPARAR</span>
     </div>
@@ -173,14 +201,14 @@
 
     <script>
         const COUNTRIES = [
-            { id: 'bra', name: 'Brasil', flag: '🇧🇷', color: '#22c55e' },
-            { id: 'arg', name: 'Argentina', flag: '🇦🇷', color: '#3b82f6' },
-            { id: 'can', name: 'Canadá', flag: '🇨🇦', color: '#ef4444' },
-            { id: 'sco', name: 'Escócia', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: '#1e40af' },
-            { id: 'swe', name: 'Suécia', flag: '🇸🇪', color: '#fbbf24' },
-            { id: 'nor', name: 'Noruega', flag: '🇳🇴', color: '#991b1b' },
-            { id: 'jap', name: 'Japão', flag: '🇯🇵', color: '#f87171' },
-            { id: 'usa', name: 'EUA', flag: '🇺🇸', color: '#1e293b' }
+            { id: 'br', name: 'Brasil', code: 'BRA', color: '#22c55e', handle: '#facc15' },
+            { id: 'ar', name: 'Argentina', code: 'ARG', color: '#3b82f6', handle: '#ffffff' },
+            { id: 'ca', name: 'Canadá', code: 'CAN', color: '#ef4444', handle: '#ffffff' },
+            { id: 'gb-sct', name: 'Escócia', code: 'SCO', color: '#1e40af', handle: '#cbd5e1' },
+            { id: 'se', name: 'Suécia', code: 'SWE', color: '#eab308', handle: '#1e3a8a' },
+            { id: 'no', name: 'Noruega', code: 'NOR', color: '#991b1b', handle: '#ffffff' },
+            { id: 'jp', name: 'Japão', code: 'JPN', color: '#f87171', handle: '#ffffff' },
+            { id: 'us', name: 'EUA', code: 'USA', color: '#1e293b', handle: '#ef4444' }
         ];
 
         let team1 = COUNTRIES[0];
@@ -190,15 +218,15 @@
         const ctx = canvas.getContext('2d');
         
         const PHYSICS = {
-            friction: 0.988,        // Um pouco mais de fricção para ir mais devagar
-            sweepFriction: 0.995,   // Varredura reduz a fricção
+            friction: 0.988,
+            sweepFriction: 0.995,
             stopThreshold: 0.15, 
-            maxInitialVel: 11.5,    // Velocidade máxima reduzida
+            maxInitialVel: 11.5,
             stoneRadius: 10,
             houseRadius: 80,
             rinkWidth: 350,
-            powerFillSpeed: 0.6,
-            houseY: 50
+            powerFillSpeed: 0.7,
+            houseY: 60
         };
 
         let state = {
@@ -219,6 +247,10 @@
             scoringStones: []
         };
 
+        function getFlagUrl(id) {
+            return `https://flagcdn.com/w80/${id}.png`;
+        }
+
         function populateMenus() {
             const t1 = document.getElementById('team1-list');
             const t2 = document.getElementById('team2-list');
@@ -231,8 +263,14 @@
 
         function createCountryBtn(c, teamNum) {
             const div = document.createElement('div');
-            div.className = `country-opt p-2 bg-slate-800 rounded-lg flex items-center justify-center gap-2 text-sm font-bold`;
-            div.innerHTML = `<span>${c.flag}</span> <span class="hidden sm:inline">${c.id.toUpperCase()}</span>`;
+            div.className = `country-opt p-2 rounded-lg flex items-center gap-2 text-[11px] font-bold`;
+            div.innerHTML = `
+                <img src="${getFlagUrl(c.id)}" class="w-5 h-3.5 object-cover rounded-sm">
+                <span class="flex-1">${c.code}</span>
+                <div class="stone-preview" style="background-color: ${c.color}">
+                    <div class="handle-preview" style="background-color: ${c.handle}"></div>
+                </div>
+            `;
             div.onclick = () => {
                 if (teamNum === 1) team1 = c; else team2 = c;
                 updateSelectionUI();
@@ -252,10 +290,10 @@
 
         function startGame() {
             document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('ui-t1-flag').innerText = team1.flag;
-            document.getElementById('ui-t1-name').innerText = team1.id.toUpperCase();
-            document.getElementById('ui-t2-flag').innerText = team2.flag;
-            document.getElementById('ui-t2-name').innerText = team2.id.toUpperCase();
+            document.getElementById('ui-t1-flag').src = getFlagUrl(team1.id);
+            document.getElementById('ui-t1-name').innerText = team1.code;
+            document.getElementById('ui-t2-flag').src = getFlagUrl(team2.id);
+            document.getElementById('ui-t2-name').innerText = team2.code;
             initGame();
         }
 
@@ -302,7 +340,7 @@
         function handleMouseDown(e) {
             if (e.target.closest('.scoreboard') || e.target.closest('#launch-btn') || e.target.closest('#end-card') || e.target.closest('.zoom-controls')) return;
             const anyMoving = state.stones.some(s => s.moving);
-            if (anyMoving && state.currentStone?.moving) {
+            if (anyMoving) {
                 state.isSweeping = true;
             } else if (state.readyToLaunch && !state.gameOver) {
                 state.isCharging = true;
@@ -330,7 +368,8 @@
             if (e.target.closest('.scoreboard') || e.target.closest('#launch-btn') || e.target.closest('#end-card') || e.target.closest('.zoom-controls')) return;
             const touch = e.touches[0];
             updateMousePos(touch.clientX, touch.clientY);
-            if (state.stones.some(s => s.moving) && state.currentStone?.moving) {
+            const anyMoving = state.stones.some(s => s.moving);
+            if (anyMoving) {
                 state.isSweeping = true;
             } else if (state.readyToLaunch && !state.gameOver) {
                 state.isCharging = true;
@@ -370,8 +409,8 @@
                 vy: Math.sin(angle) * force,
                 team: state.turn,
                 color: activeTeam.color,
-                flag: activeTeam.flag,
-                handleColor: '#ffffff',
+                handleColor: activeTeam.handle,
+                flagId: activeTeam.id,
                 moving: true
             };
             state.stones.push(stone);
@@ -397,14 +436,14 @@
             let stoneStoppedThisFrame = false;
             state.stones.forEach(s => {
                 if (s.moving) {
-                    const f = (state.isSweeping && s === state.currentStone) ? PHYSICS.sweepFriction : PHYSICS.friction;
+                    const f = (state.isSweeping) ? PHYSICS.sweepFriction : PHYSICS.friction;
                     s.vx *= f; s.vy *= f;
                     s.x += s.vx; s.y += s.vy;
                     if (Math.sqrt(s.vx*s.vx + s.vy*s.vy) < PHYSICS.stopThreshold) {
                         s.vx = 0; s.vy = 0; s.moving = false;
                         stoneStoppedThisFrame = true;
                     }
-                    state.camera.y = s.y;
+                    if (s === state.currentStone) state.camera.y = s.y;
                 }
                 drawStone(s);
             });
@@ -467,33 +506,20 @@
 
         function drawStone(s) {
             const isScoring = state.scoringStones.includes(s.id);
-            
-            // Halo de pontuação
             if (isScoring) {
                 ctx.beginPath(); ctx.arc(s.x, s.y, PHYSICS.stoneRadius + 4, 0, Math.PI * 2);
                 ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3; ctx.stroke();
             }
-
-            // Corpo da pedra
             ctx.beginPath(); ctx.arc(s.x, s.y, PHYSICS.stoneRadius, 0, Math.PI * 2);
             ctx.fillStyle = s.color; ctx.fill();
             ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; ctx.stroke();
-            
-            // Puxador
             ctx.beginPath(); ctx.arc(s.x, s.y, PHYSICS.stoneRadius * 0.55, 0, Math.PI * 2);
             ctx.fillStyle = s.handleColor; ctx.fill();
 
-            // Bandeirinha sobre a pedra (visível se zoom for alto)
-            if (state.camera.zoom > 0.6) {
-                ctx.font = "12px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText(s.flag, s.x, s.y - 15);
-            }
-
-            // Distância ao centro se o jogo acabou
             if (state.gameOver) {
                 const dist = Math.sqrt(s.x*s.x + (s.y - PHYSICS.houseY)**2).toFixed(1);
                 ctx.fillStyle = "#1e293b"; ctx.font = "bold 9px Inter";
+                ctx.textAlign = "center";
                 ctx.fillText(dist, s.x, s.y + 24);
             }
         }
@@ -501,24 +527,23 @@
         function drawGuides() {
             if (state.isCharging) {
                 const startY = 950;
-                const maxLength = 220 - (state.power * 1.5);
+                const maxLength = 220 - (state.power * 1.2);
                 const angle = Math.atan2(state.mouseY - startY, state.mouseX);
-                
                 ctx.beginPath();
                 ctx.moveTo(0, startY);
                 ctx.lineTo(Math.cos(angle) * maxLength, startY + Math.sin(angle) * maxLength);
-                ctx.strokeStyle = `rgba(0,0,0,${0.7 - (state.power/200)})`; 
-                ctx.lineWidth = 5;
+                ctx.strokeStyle = `rgba(0,0,0,${0.6 - (state.power/200)})`; 
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 5]);
                 ctx.stroke();
+                ctx.setLineDash([]);
             }
-
-            // Efeito visual de Varredura (Sweep)
-            if (state.isSweeping && state.currentStone?.moving) {
+            if (state.isSweeping && state.stones.some(s => s.moving)) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.ellipse(state.currentStone.x, state.currentStone.y - 20, 25, 12, 0, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
-                ctx.shadowBlur = 10; ctx.shadowColor = '#38bdf8';
+                const ms = state.stones.find(s => s.moving) || {x:0, y:0};
+                ctx.ellipse(ms.x, ms.y - 15, 25, 12, 0, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
                 ctx.fill();
                 ctx.restore();
             }
@@ -527,7 +552,7 @@
         function calculateScore() {
             state.gameOver = true;
             const stonesInfo = state.stones.map(s => ({
-                id: s.id, team: s.team, flag: s.flag,
+                id: s.id, team: s.team, flagId: s.flagId,
                 dist: Math.sqrt(s.x*s.x + (s.y - PHYSICS.houseY)**2)
             })).filter(s => s.dist <= PHYSICS.houseRadius);
 
@@ -556,9 +581,12 @@
             }).map(s => {
                 const dist = Math.sqrt(s.x*s.x + (s.y - PHYSICS.houseY)**2);
                 const inHouse = dist <= PHYSICS.houseRadius;
-                return `<div class="flex justify-between items-center text-[11px] p-1.5 border-b ${inHouse ? 'bg-blue-50' : 'opacity-40'}">
-                    <span>${s.flag} Pedra</span> 
-                    <span class="font-mono font-bold">${dist.toFixed(1)}u</span>
+                return `<div class="flex justify-between items-center text-[11px] p-2 border-b ${inHouse ? 'bg-blue-50' : 'opacity-40'}">
+                    <div class="flex items-center gap-2">
+                        <img src="${getFlagUrl(s.flagId)}" class="w-4 h-2.5 rounded-xs">
+                        <span class="font-bold">Pedra</span>
+                    </div>
+                    <span class="font-mono font-black">${dist.toFixed(1)}u</span>
                 </div>`;
             }).join('');
 
