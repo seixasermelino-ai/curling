@@ -48,7 +48,6 @@
             height: 100%;
             background: linear-gradient(90deg, #22c55e, #eab308);
             border-radius: 10px;
-            transition: width 0.05s linear;
         }
         #ideal-marker {
             position: absolute; top: -4px; bottom: -4px; width: 4px;
@@ -66,18 +65,27 @@
             gap: 6px;
             transition: all 0.2s ease;
         }
-        .active-bra { border-color: #22c55e; background: #f0fdf4; transform: translateY(-2px); }
-        .active-arg { border-color: #3b82f6; background: #eff6ff; transform: translateY(-2px); }
+        .active-bra { border-color: #22c55e; background: #f0fdf4; }
+        .active-arg { border-color: #3b82f6; background: #eff6ff; }
         
-        .mobile-controls {
+        .controls-layer {
             position: absolute;
             bottom: 20px;
+            left: 15px;
             right: 15px;
             display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        .side-btns {
+            display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             pointer-events: auto;
         }
+
         .btn-round {
             width: 50px; height: 50px;
             background: white;
@@ -88,7 +96,23 @@
             color: #1e293b;
             user-select: none;
         }
-        .btn-round:active { transform: scale(0.9); background: #f1f5f9; }
+
+        #launch-btn {
+            width: 80px; height: 80px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+            font-size: 10px; font-weight: 900;
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+            pointer-events: auto;
+            border: 4px solid white;
+            user-select: none;
+            transition: transform 0.1s;
+        }
+        #launch-btn:active { transform: scale(0.9); }
+        #launch-btn.disabled { background: #94a3b8; box-shadow: none; opacity: 0.5; pointer-events: none; }
 
         #score-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -142,17 +166,24 @@
                 <div id="power-bar"></div>
             </div>
             <div class="flex justify-between mt-1 px-1">
-                <span class="text-[9px] font-bold text-slate-400 uppercase">Fraco</span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase">Puxe</span>
                 <span id="turn-info" class="text-[9px] font-bold uppercase text-slate-600">Vez: Brasil</span>
                 <span class="text-[9px] font-bold text-red-500 uppercase">Ideal</span>
             </div>
         </div>
     </div>
 
-    <div class="mobile-controls">
-        <div class="btn-round" onclick="adjustZoom(0.15)">＋</div>
-        <div class="btn-round" onclick="adjustZoom(-0.15)">－</div>
-        <div class="btn-round bg-slate-800 !text-white !text-[10px]" onclick="resetZoom()">RESET</div>
+    <div class="controls-layer">
+        <div class="side-btns">
+            <div class="btn-round" onclick="adjustZoom(0.15)">＋</div>
+            <div class="btn-round" onclick="adjustZoom(-0.15)">－</div>
+            <div class="btn-round bg-slate-800 !text-white !text-[9px]" onclick="resetZoom()">RESET</div>
+        </div>
+
+        <div id="launch-btn">
+            <span class="text-xl mb-1">🥌</span>
+            <span>LANÇAR</span>
+        </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -168,7 +199,7 @@
             stoneRadius: 10,
             houseRadius: 80,
             rinkWidth: 350,
-            powerFillSpeed: 0.3
+            powerFillSpeed: 0.35
         };
 
         let state = {
@@ -182,6 +213,8 @@
             hammer: 'arg',
             mouseX: 0, mouseY: 0,
             isSweeping: false,
+            isPanning: false,
+            panStartY: 0,
             gameOver: false,
             camera: { x: 0, y: 500, zoom: 1 }
         };
@@ -189,15 +222,20 @@
         function init() {
             resize();
             window.addEventListener('resize', resize);
-            window.addEventListener('mousemove', e => updateMousePos(e.clientX, e.clientY));
-            window.addEventListener('mousedown', startAction);
-            window.addEventListener('mouseup', endAction);
             
-            window.addEventListener('touchstart', e => { 
-                updateMousePos(e.touches[0].clientX, e.touches[0].clientY);
-                startAction(); 
-            }, {passive: false});
-            window.addEventListener('touchend', endAction);
+            // Eventos globais de mouse/toque para Panning (passear pela pista)
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mousedown', handleMouseDown);
+            window.addEventListener('mouseup', handleMouseUp);
+            
+            window.addEventListener('touchstart', handleTouchStart, {passive: false});
+            window.addEventListener('touchmove', handleTouchMove, {passive: false});
+            window.addEventListener('touchend', handleTouchEnd);
+
+            // Botão de lançar dedicado
+            const lBtn = document.getElementById('launch-btn');
+            lBtn.addEventListener('mousedown', startCharging);
+            lBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startCharging(); });
 
             requestAnimationFrame(update);
             updateUI();
@@ -212,7 +250,6 @@
         }
 
         function resetZoom() {
-            // Garante que a pista cabe sempre na largura do mobile
             state.camera.zoom = Math.min(state.width / 380, state.height / 1100);
             state.camera.y = 500;
             state.camera.x = 0;
@@ -222,31 +259,83 @@
             state.camera.zoom = Math.max(0.3, Math.min(2.5, state.camera.zoom + delta));
         }
 
-        function updateMousePos(ix, iy) {
-            state.mouseX = (ix - state.width/2) / state.camera.zoom + state.camera.x;
-            state.mouseY = (iy - state.height/2) / state.camera.zoom + state.camera.y;
+        // --- Lógica de Input ---
+
+        function handleMouseDown(e) {
+            if (e.target.closest('.glass-panel') || e.target.closest('.controls-layer')) return;
+            const anyMoving = state.stones.some(s => s.moving);
+            if (anyMoving && state.currentStone && state.currentStone.moving) {
+                state.isSweeping = true;
+            } else {
+                state.isPanning = true;
+                state.panStartY = e.clientY;
+            }
         }
 
-        function startAction() {
+        function handleMouseMove(e) {
+            updateMousePos(e.clientX, e.clientY);
+            if (state.isPanning) {
+                const dy = (e.clientY - state.panStartY) / state.camera.zoom;
+                state.camera.y -= dy;
+                state.panStartY = e.clientY;
+            }
+        }
+
+        function handleMouseUp() {
+            if (state.isCharging) launchStone();
+            state.isCharging = false;
+            state.isSweeping = false;
+            state.isPanning = false;
+        }
+
+        function handleTouchStart(e) {
+            if (e.target.closest('.glass-panel') || e.target.closest('.controls-layer')) return;
+            const touch = e.touches[0];
+            updateMousePos(touch.clientX, touch.clientY);
+            const anyMoving = state.stones.some(s => s.moving);
+            if (anyMoving && state.currentStone && state.currentStone.moving) {
+                state.isSweeping = true;
+            } else {
+                state.isPanning = true;
+                state.panStartY = touch.clientY;
+            }
+        }
+
+        function handleTouchMove(e) {
+            const touch = e.touches[0];
+            updateMousePos(touch.clientX, touch.clientY);
+            if (state.isPanning) {
+                const dy = (touch.clientY - state.panStartY) / state.camera.zoom;
+                state.camera.y -= dy;
+                state.panStartY = touch.clientY;
+            }
+        }
+
+        function handleTouchEnd() {
+            handleMouseUp();
+        }
+
+        function startCharging() {
             if (state.gameOver) return;
             const anyMoving = state.stones.some(s => s.moving);
             if (state.stonesLeft > 0 && !anyMoving) {
                 state.isCharging = true;
                 state.power = 0;
-            } else if (state.currentStone && state.currentStone.moving) {
-                state.isSweeping = true;
+                // Foca a câmara no ponto de lançamento
+                state.camera.y = 850;
             }
         }
 
-        function endAction() {
-            if (state.isCharging) launchStone();
-            state.isCharging = false;
-            state.isSweeping = false;
+        function updateMousePos(ix, iy) {
+            state.mouseX = (ix - state.width/2) / state.camera.zoom + state.camera.x;
+            // Note: mouseY is relevant for aiming during charging
+            state.mouseY = (iy - state.height/2) / state.camera.zoom + state.camera.y;
         }
 
         function launchStone() {
             const startX = 0;
             const startY = 950;
+            // Mirar sempre em relação ao ponto de saída
             const angle = Math.atan2(state.mouseY - startY, state.mouseX - startX);
             const force = (state.power / 100) * PHYSICS.maxInitialVel;
             
@@ -266,6 +355,8 @@
             state.turn = state.turn === 'bra' ? 'arg' : 'bra';
             updateUI();
         }
+
+        // --- Update e Draw ---
 
         function update() {
             ctx.clearRect(0, 0, state.width, state.height);
@@ -291,7 +382,7 @@
                         s.vx = 0; s.vy = 0; s.moving = false;
                         stoneStoppedThisFrame = true;
                     }
-                    // Auto-follow camera suave
+                    // Auto-follow apenas durante o movimento
                     state.camera.y = s.y;
                 }
                 drawStone(s);
@@ -335,7 +426,7 @@
         function drawRink() {
             const w = PHYSICS.rinkWidth, houseY = 50; 
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-w/2, -100, w, 1150);
+            ctx.fillRect(-w/2, -500, w, 2000);
             
             // Desenho da House (Alvo)
             const rings = [
@@ -352,7 +443,7 @@
 
             // Linhas de campo
             ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(0, -100); ctx.lineTo(0, 1050); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -500); ctx.lineTo(0, 1500); ctx.stroke();
             
             ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.moveTo(-w/2, houseY + 250); ctx.lineTo(w/2, houseY + 250); ctx.stroke(); // Hog Line
@@ -372,10 +463,10 @@
 
         function drawGuides() {
             const anyMoving = state.stones.some(s => s.moving);
-            if (state.isCharging || (state.stonesLeft > 0 && !anyMoving)) {
+            if (state.isCharging) {
                 ctx.beginPath(); ctx.setLineDash([5, 5]);
                 ctx.moveTo(0, 950); ctx.lineTo(state.mouseX, state.mouseY);
-                ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
                 ctx.setLineDash([]);
             }
             if (state.isSweeping && state.currentStone && state.currentStone.moving) {
@@ -425,16 +516,18 @@
             const braCard = document.getElementById('card-bra');
             const argCard = document.getElementById('card-arg');
             const turnInfo = document.getElementById('turn-info');
+            const lBtn = document.getElementById('launch-btn');
 
             braCard.className = 'team-badge relative ' + (state.turn === 'bra' && !anyMoving ? 'active-bra' : 'bg-slate-50 opacity-60');
             argCard.className = 'team-badge relative ' + (state.turn === 'arg' && !anyMoving ? 'active-arg' : 'bg-slate-50 opacity-60');
             
             if (anyMoving) {
-                turnInfo.innerText = "Pedra em movimento...";
-                turnInfo.className = "text-[9px] font-bold uppercase text-slate-400 italic";
+                turnInfo.innerText = "Em movimento...";
+                lBtn.classList.add('disabled');
             } else {
                 turnInfo.innerText = "Vez: " + (state.turn === 'bra' ? 'Brasil' : 'Argentina');
                 turnInfo.className = "text-[9px] font-bold uppercase " + (state.turn === 'bra' ? 'text-green-600' : 'text-blue-600');
+                lBtn.classList.remove('disabled');
             }
         }
 
